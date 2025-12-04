@@ -40,26 +40,10 @@
 <h3 class="fw-light text-muted" style="padding-bottom: 10px; font-size: 1.5rem;">Hola <span id="usuario"></span> 👋</h3>
 
 </div>
-    <script>
-    // Verifica si existe sesion
-    const usuarioJSON = localStorage.getItem("usuario");
-
-    if (!usuarioJSON) {
-        // Si no hay sesión → mandar al login
-        window.location.href = "login.html";
-    } else {
-        // Convertir el JSON guardado a objeto
-        const usuario = JSON.parse(usuarioJSON);
-
-        // Mostrar SOLO el nombre
-        document.getElementById("usuario").textContent = usuario.nombre;
-    }
-
-    function cerrarSesion() {
-        localStorage.removeItem("usuario");
-        window.location.href = "login.html";
-    }
-</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="utils.js"></script>
+<script>
+    requireSession()
+</script>
 </body>
 </html>

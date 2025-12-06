@@ -1,9 +1,0 @@
-CREATE DATABASE IF NOT EXISTS mi_app;
-USE mi_app;
-
-CREATE TABLE usuarios (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  nombre VARCHAR(100),
-  email VARCHAR(100) UNIQUE,
-  password VARCHAR(255)
-);

@@ -1,81 +1,134 @@
-// abrir la terminal en CMD
-// npm init -y
-// npm install express
-// npm install mysql2
-// npm install express mysql2 cors
-// npm install bcrypt  >>>>>> para hash contraseñas
-
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
-const bcrypt = require("bcrypt")
+const bcrypt = require("bcrypt");
+const multer = require("multer");
+const path = require("path");
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+
+// Para permitir servir imágenes desde /uploads
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 
 // Conexión a MySQL
 const db = mysql.createConnection({
     host: "localhost",
-    user: "root",     // tu usuario
-    password: "58242",     // tu contraseña de MySQL
-    database: "mi_app"  // la base que creaste
+    user: "root",
+    password: "58242",
+    database: "mi_app"
 });
 
-// Ruta para registrar usuario
-app.post("/registro", (req, res) => {
-    console.log("Datos recibidos del frontend:", req.body);  // muestra en consola para comprobar que ande bien
 
-    const { nombre, email, password } = req.body; // recupera los datos que se enviaron en scriptRegistro.js
+// ------------------------------------------
+// ⚙️ CONFIGURAR MULTER PARA GUARDAR ARCHIVOS
+// ------------------------------------------
+
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, "uploads/"); // carpeta donde se guardan imágenes
+    },
+    filename: function(req, file, cb) {
+        const nombreFinal = Date.now() + "-" + file.originalname;
+        cb(null, nombreFinal); // nombre único
+    }
+});
+
+const upload = multer({ storage });
+
+
+// ------------------------------------------
+// 🟦 RUTA PARA REGISTRAR USUARIO
+// ------------------------------------------
+
+app.use(express.json());
+
+app.post("/registro", (req, res) => {
+    const { nombre, email, password } = req.body;
 
     const passwordHash = bcrypt.hashSync(password, 10);
 
-    const sql = "INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)"; // sentencia sql para agregar un usuario
+    const sql = "INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)";
 
-    db.query(sql, [nombre, email, passwordHash], (err, result) => {
-        if (err) {
-            return res.json({ ok: false, error: "Error en la BD: " + err }); // si hay un err (error) devuelve ok -> false y error -> Error en la bd..
-        }
-        return res.json({ ok: true }); // devuelve ok -> True
+    db.query(sql, [nombre, email, passwordHash], (err) => {
+        if (err) return res.json({ ok: false, error: "Error en la BD: " + err });
+        return res.json({ ok: true });
     });
 });
 
 
+// ------------------------------------------
+// 🟩 RUTA PARA LOGIN
+// ------------------------------------------
 
-
-// Ruta para login
 app.post("/login", (req, res) => {
-    console.log("Login recibido:", req.body);
-
     const { email, password } = req.body;
 
-    const passwordHash = bcrypt.hash(password, 10);
-
-    const sql = "SELECT * FROM usuarios WHERE email = ?"; // sentencia para buscar usuarios con el email ingresado
+    const sql = "SELECT * FROM usuarios WHERE email = ?";
 
     db.query(sql, [email], (err, results) => {
-        if (err) return res.json({ ok: false, error: "Error en la BD: " + err }); // error en la bd
+        if (err) return res.json({ ok: false, error: "Error en la BD: " + err });
 
         if (results.length === 0) {
-            return res.json({ ok: false, error: "Email no registrado." }); // no encontró el email en la bd
+            return res.json({ ok: false, error: "Email no registrado." });
         }
 
-        const usuario = results[0]; // si encuentra el email el primer elemento del array será un objeto usuario
+        const usuario = results[0];
 
-       // Comparar contraseña ingresada (texto plano) con el hash guardado
-            const coincide = bcrypt.compareSync(password, usuario.password);
-            if (!coincide) {
-                return res.json({ ok: false, error: "Contraseña incorrecta." });
-            }
+        const coincide = bcrypt.compareSync(password, usuario.password);
+        if (!coincide) {
+            return res.json({ ok: false, error: "Contraseña incorrecta." });
+        }
 
-
-        return res.json({ ok: true, nombre: usuario.nombre }); // la contraseña coincide e inicia la sesion
+        return res.json({ ok: true, nombre: usuario.nombre });
     });
 });
 
-// Iniciar servidor
-app.listen(3000, () => {
-    console.log("Servidor corriendo en http://localhost:3000"); 
+
+// ------------------------------------------
+// 🟨 RUTA PARA CARGAR MÁQUINA CON IMAGEN
+// ------------------------------------------
+
+app.post("/cargarMaquina", upload.single("imagen"), (req, res) => {
+    const { nombre, descripcion, tipo } = req.body;
+
+    if (!req.file) {
+        return res.json({ ok: false, error: "No se recibió la imagen." });
+    }
+
+    const rutaImagen = "/uploads/" + req.file.filename;
+
+    const sql = `
+        INSERT INTO maquinas (nombre, descripcion, tipo, imagen)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    db.query(sql, [nombre, descripcion, tipo, rutaImagen], (err) => {
+        if (err) return res.json({ ok: false, error: "Error en la BD: " + err });
+        return res.json({ ok: true });
+    });
 });
 
-// node server.js -> en la terminal cada vez que se modifique este archivo
+// ------------------------------------------
+// 🟩 MOSTRAR MAQUINAS CARGADAS
+// ------------------------------------------
+
+app.get("/maquinas", (req, res) => {
+    const sql = "SELECT * FROM maquinas";
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            return res.json({ ok: false, error: "Error en la BD: " + err });
+        }
+        res.json(results);
+    });
+});
+
+// ------------------------------------------
+// 🚀 INICIAR SERVIDOR
+// ------------------------------------------
+
+app.listen(3000, () => {
+    console.log("Servidor corriendo en http://localhost:3000");
+});
